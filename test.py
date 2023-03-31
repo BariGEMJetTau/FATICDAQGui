@@ -55,6 +55,16 @@ if __name__ == "__main__":
         f.close()
         return NEntry
 
+    def NTrigMatch(Str1,Str2):
+        import re
+        regexp = re.compile("Time:(.*) Trg:(.*) Ev:(.*)")
+        re_match_str1=regexp.match(Str1)
+        re_match_str2=regexp.match(Str2)
+        match=False
+        if re_match_str1 and re_match_str2:
+            if int(re_match_str1.group(2))==int(re_match_str2.group(2)): match=True
+        return match
+
     import subprocess,sys
     import logging
     logging.basicConfig(level=logging.DEBUG)
@@ -69,21 +79,23 @@ if __name__ == "__main__":
     cmdMOSAIC250="/home/vfat3/vfat3_testing_ll/VFAT3 -cfg /home/vfat3/vfat3_testing_ll/cfg/tb_gem_250.cfg -set_default_chip 0 -chip_init -DAQ 2>&1 > Data/.outputMOSAIC250.log &"
     spMOSAIC250 = subprocess.Popen(cmdMOSAIC250, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     #out250, err250 = spMOSAIC250.communicate()
-
+    time.sleep(2)
     cmdMOSAIC251="/home/vfat3/vfat3_testing_ll/VFAT3 -cfg /home/vfat3/vfat3_testing_ll/cfg/tb_gem_251.cfg -set_default_chip 0 -chip_init -DAQ 2>&1 > Data/.outputMOSAIC251.log &"
     spMOSAIC251 = subprocess.Popen(cmdMOSAIC251, stdout=subprocess.PIPE, stderr=subprocess.PIPE,shell=True)
     #out251, err251 = spMOSAIC251.communicate()
+    time.sleep(2)
 
-    time.sleep(5)
     err=0
+    sync=True
     while not checkStatus("Data/.outputMOSAIC250.log","Sync OK") or not checkStatus("Data/.outputMOSAIC251.log","Sync OK"):
         logging.warning("MOSAIC boards not yet ready")
         time.sleep(1)
         err+=1
         if err>20:
             logging.error("Not able to configure check Data/.outputMOSAIC250.log and Data/.outputMOSAIC251.log ")
+            sync=False
             break
-    logging.info("VFAT Sync OK")
+    if sync: logging.info("VFAT Sync OK")
     if checkStatus("Data/.outputMOSAIC250.log","Standard DAQ run") and checkStatus("Data/.outputMOSAIC251.log","Standard DAQ run"):
         logging.info(">>> ENABLE TRIGGER <<<")
         logging.info(">>> To check the triggered events press Return <<<")
@@ -92,7 +104,13 @@ if __name__ == "__main__":
         while not checkIn=="Stop":
             logging.info("MOSAIC250: "+getNEntry("Data/.outputMOSAIC250.log")+" MOSAIC251: "+getNEntry("Data/.outputMOSAIC251.log"))
             checkIn=input()
-
+        logging.info("writing binary files")
+        while not NTrigMatch(getNEntry("Data/.outputMOSAIC250.log"),getNEntry("Data/.outputMOSAIC251.log")): 
+            logging.info("MOSAIC250: "+getNEntry("Data/.outputMOSAIC250.log")+" MOSAIC251: "+getNEntry("Data/.outputMOSAIC251.log"))
+            time.sleep(4)
+        logging.info("binary files done")
+    else:
+        logging.error("Not able to start acquisition, check Data/.outputMOSAIC250.log and Data/.outputMOSAIC251.log ")
     cmdKillAllVFAT="killall -w VFAT3"
 
     powSup.turnChOff("OUT2")
